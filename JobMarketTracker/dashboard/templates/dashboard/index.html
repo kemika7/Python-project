@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Job Market Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filter-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .filter-group input,
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Real-Time Job Market Tracker</h1>
+            <p>Track job postings, analyze skill demand, and monitor salary trends in real-time</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Jobs</h3>
+                <div class="value" id="totalJobs">{{ total_jobs }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Recent Jobs (7 days)</h3>
+                <div class="value" id="recentJobs">{{ recent_jobs }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Skills Tracked</h3>
+                <div class="value" id="skillsTracked">-</div>
+            </div>
+        </div>
+        
+        <div class="filter-section">
+            <h3>Filters</h3>
+            <div class="filter-group">
+                <label>
+                    Days Range
+                    <select id="daysFilter">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                    </select>
+                </label>
+                <label>
+                    Role
+                    <input type="text" id="roleFilter" placeholder="e.g., Python Developer">
+                </label>
+                <label>
+                    <span>&nbsp;</span>
+                    <button class="btn" onclick="loadData()">Apply Filters</button>
+                </label>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Job Volume Trend</h2>
+                <div class="chart-container">
+                    <canvas id="jobVolumeChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2>Top 10 Most Demanded Skills</h2>
+                <div class="chart-container">
+                    <canvas id="skillDemandChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2>Average Salary by Role</h2>
+                <div class="chart-container">
+                    <canvas id="avgSalaryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let jobVolumeChart, skillDemandChart, avgSalaryChart;
+        
+        async function loadData() {
+            try {
+                const days = document.getElementById('daysFilter').value;
+                const role = document.getElementById('roleFilter').value;
+                
+                // Fetch job volume data
+                const volumeResponse = await fetch(`/api/analytics/role-volume/?days=${days}`);
+                const volumeData = await volumeResponse.json();
+                
+                // Fetch skill demand data
+                const skillUrl = role 
+                    ? `/api/analytics/skill-demand/?top=10&role=${encodeURIComponent(role)}`
+                    : '/api/analytics/skill-demand/?top=10';
+                const skillResponse = await fetch(skillUrl);
+                const skillData = await skillResponse.json();
+                
+                // Fetch average salary data
+                const salaryResponse = await fetch('/api/analytics/avg-salary/');
+                const salaryData = await salaryResponse.json();
+                
+                // Update charts
+                updateJobVolumeChart(volumeData);
+                updateSkillDemandChart(skillData);
+                updateAvgSalaryChart(salaryData);
+                
+                // Update stats
+                document.getElementById('skillsTracked').textContent = skillData.total_skills || 0;
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        function updateJobVolumeChart(data) {
+            const ctx = document.getElementById('jobVolumeChart').getContext('2d');
+            
+            if (jobVolumeChart) {
+                jobVolumeChart.destroy();
+            }
+            
+            jobVolumeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.dates || [],
+                    datasets: [{
+                        label: 'Job Postings',
+                        data: data.counts || [],
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateSkillDemandChart(data) {
+            const ctx = document.getElementById('skillDemandChart').getContext('2d');
+            
+            if (skillDemandChart) {
+                skillDemandChart.destroy();
+            }
+            
+            const skills = data.skills || [];
+            const labels = skills.map(s => s.skill_name);
+            const frequencies = skills.map(s => s.frequency);
+            
+            skillDemandChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Demand Frequency',
+                        data: frequencies,
+                        backgroundColor: 'rgba(118, 75, 162, 0.8)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateAvgSalaryChart(data) {
+            const ctx = document.getElementById('avgSalaryChart').getContext('2d');
+            
+            if (avgSalaryChart) {
+                avgSalaryChart.destroy();
+            }
+            
+            const roles = data.roles || [];
+            const salaries = data.avg_salaries || [];
+            
+            if (roles.length === 0) {
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.fillText('No salary data available', 10, 50);
+                return;
+            }
+            
+            avgSalaryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: roles,
+                    datasets: [{
+                        label: 'Average Salary ($)',
+                        data: salaries,
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            // Refresh data every 5 minutes
+            setInterval(loadData, 5 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
+
