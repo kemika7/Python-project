@@ -150,6 +150,33 @@
             margin-bottom: 2rem;
         }
         
+        .section-title {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        .section-title h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+        
+        .chart-card-wide {
+            grid-column: span 2;
+        }
+        
+        @media (max-width: 768px) {
+            .chart-card-wide {
+                grid-column: span 1;
+            }
+        }
+        
         .chart-card {
             background: var(--card-bg);
             padding: 2rem;
@@ -419,6 +446,33 @@
         .placeholder-message.hidden {
             display: none;
         }
+
+        /* Section title styling */
+        .section-title {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+
+        .section-title h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-title p {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+        }
     </style>
 </head>
 <body>
@@ -466,6 +520,11 @@
         </div>
         
         <div class="charts-grid" id="chartsContainer" style="display: none;">
+            <div class="section-title">
+                <h1>📊 Job Market Insights</h1>
+            </div>
+            
+            <!-- Row 1: Core Metrics -->
             <div class="chart-card">
                 <h2 id="volumeChartTitle">Job Volume Trend</h2>
                 <div class="chart-container">
@@ -486,6 +545,43 @@
                     <canvas id="avgSalaryChart"></canvas>
                 </div>
             </div>
+            
+            <!-- Row 2: Company & Location -->
+            <div class="chart-card">
+                <h2 id="companyChartTitle">Top Companies Hiring</h2>
+                <div class="chart-container">
+                    <canvas id="companyChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2 id="locationChartTitle">Geographical Job Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="locationChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2 id="experienceChartTitle">Experience Level Breakdown</h2>
+                <div class="chart-container">
+                    <canvas id="experienceChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Row 3: Salary & Skills -->
+            <div class="chart-card">
+                <h2 id="salaryDistChartTitle">Salary Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="salaryDistChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card chart-card-wide">
+                <h2 id="skillCorrChartTitle">Skill Correlation Network</h2>
+                <div class="chart-container">
+                    <canvas id="skillCorrChart"></canvas>
+                </div>
+            </div>
         </div>
         
         <div class="placeholder-message" id="placeholderMessage">
@@ -500,13 +596,19 @@
     
     <script>
         let jobVolumeChart, skillDemandChart, avgSalaryChart;
+        let companyChart, locationChart, experienceChart;
+        let salaryDistChart, skillCorrChart;
         let isLoading = false;
         let hasSearched = false;
         
         // Show loading state
         function showLoading() {
             isLoading = true;
-            const charts = ['jobVolumeChart', 'skillDemandChart', 'avgSalaryChart'];
+            const charts = [
+                'jobVolumeChart', 'skillDemandChart', 'avgSalaryChart',
+                'companyChart', 'locationChart', 'experienceChart',
+                'salaryDistChart', 'skillCorrChart'
+            ];
             charts.forEach(chartId => {
                 const canvas = document.getElementById(chartId);
                 if (canvas) {
@@ -534,7 +636,7 @@
         // Hide placeholder and show charts
         function hidePlaceholder() {
             document.getElementById('placeholderMessage').style.display = 'none';
-            document.getElementById('chartsContainer').style.display = 'grid';
+            document.getElementById('chartsContainer').style.display = 'block';
         }
         
         // Validate input
@@ -564,11 +666,26 @@
                 const role = document.getElementById('roleFilter').value.trim();
                 
                 // Fetch all data in parallel with role filtering
-                const [volumeResponse, skillResponse, salaryResponse, jobsResponse] = await Promise.all([
+                const [
+                    volumeResponse, 
+                    skillResponse, 
+                    salaryResponse, 
+                    jobsResponse,
+                    companyResponse,
+                    locationResponse,
+                    experienceResponse,
+                    salaryDistResponse,
+                    skillCorrResponse
+                ] = await Promise.all([
                     fetch(`/api/analytics/role-volume/?days=${days}&role=${encodeURIComponent(role)}`),
                     fetch(`/api/analytics/skill-demand/?top=10&role=${encodeURIComponent(role)}`),
                     fetch(`/api/analytics/avg-salary/?role=${encodeURIComponent(role)}`),
-                    fetch(`/api/jobs/?search=${encodeURIComponent(role)}&page_size=100`)
+                    fetch(`/api/jobs/?search=${encodeURIComponent(role)}&page_size=100`),
+                    fetch(`/api/analytics/company-distribution/?role=${encodeURIComponent(role)}&top=10`),
+                    fetch(`/api/analytics/location-distribution/?role=${encodeURIComponent(role)}`),
+                    fetch(`/api/analytics/experience-level/?role=${encodeURIComponent(role)}`),
+                    fetch(`/api/analytics/salary-distribution/?role=${encodeURIComponent(role)}&bins=10`),
+                    fetch(`/api/analytics/skill-correlation/?role=${encodeURIComponent(role)}&top=15`)
                 ]);
                 
                 // Check if responses are ok
@@ -581,6 +698,11 @@
                 const skillData = await skillResponse.json();
                 const salaryData = await salaryResponse.json();
                 const jobsData = await jobsResponse.json();
+                const companyData = await companyResponse.json();
+                const locationData = await locationResponse.json();
+                const experienceData = await experienceResponse.json();
+                const salaryDistData = await salaryDistResponse.json();
+                const skillCorrData = await skillCorrResponse.json();
                 
                 // Check if we have data
                 if (!volumeData.dates || volumeData.dates.length === 0) {
@@ -600,6 +722,11 @@
                 updateJobVolumeChart(volumeData, role);
                 updateSkillDemandChart(skillData, role);
                 updateAvgSalaryChart(salaryData, role);
+                updateCompanyChart(companyData, role);
+                updateLocationChart(locationData, role);
+                updateExperienceChart(experienceData, role);
+                updateSalaryDistChart(salaryDistData, role);
+                updateSkillCorrChart(skillCorrData, role);
                 
                 hideLoading();
                 
@@ -623,10 +750,20 @@
                 document.getElementById('volumeChartTitle').textContent = `Job Volume Trend - ${roleTitle}`;
                 document.getElementById('skillChartTitle').textContent = `Top Skills for ${roleTitle}`;
                 document.getElementById('salaryChartTitle').textContent = `Average Salary - ${roleTitle}`;
+                document.getElementById('companyChartTitle').textContent = `Top Companies - ${roleTitle}`;
+                document.getElementById('locationChartTitle').textContent = `Job Locations - ${roleTitle}`;
+                document.getElementById('experienceChartTitle').textContent = `Experience Levels - ${roleTitle}`;
+                document.getElementById('salaryDistChartTitle').textContent = `Salary Distribution - ${roleTitle}`;
+                document.getElementById('skillCorrChartTitle').textContent = `Skill Correlations - ${roleTitle}`;
             } else {
                 document.getElementById('volumeChartTitle').textContent = 'Job Volume Trend';
                 document.getElementById('skillChartTitle').textContent = 'Top 10 Most Demanded Skills';
                 document.getElementById('salaryChartTitle').textContent = 'Average Salary by Role';
+                document.getElementById('companyChartTitle').textContent = 'Top Companies Hiring';
+                document.getElementById('locationChartTitle').textContent = 'Geographical Job Distribution';
+                document.getElementById('experienceChartTitle').textContent = 'Experience Level Breakdown';
+                document.getElementById('salaryDistChartTitle').textContent = 'Salary Distribution';
+                document.getElementById('skillCorrChartTitle').textContent = 'Skill Correlation Network';
             }
         }
         
@@ -1075,6 +1212,357 @@
             });
         }
         
+        // Update company distribution chart
+        function updateCompanyChart(data, role = '') {
+            const canvas = document.getElementById('companyChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (companyChart) {
+                companyChart.destroy();
+            }
+            
+            const companies = data.companies || [];
+            const counts = data.counts || [];
+            
+            if (companies.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No company data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            companyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: companies,
+                    datasets: [{
+                        label: 'Job Postings',
+                        data: counts,
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)',
+                        borderColor: 'rgba(139, 92, 246, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.x} job postings`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 11 },
+                                maxRotation: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update location distribution chart
+        function updateLocationChart(data, role = '') {
+            const canvas = document.getElementById('locationChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (locationChart) {
+                locationChart.destroy();
+            }
+            
+            const locations = data.locations || [];
+            const counts = data.counts || [];
+            
+            if (locations.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No location data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            locationChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: locations,
+                    datasets: [{
+                        label: 'Job Postings',
+                        data: counts,
+                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.x} jobs in ${context.label}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update experience level chart
+        function updateExperienceChart(data, role = '') {
+            const canvas = document.getElementById('experienceChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (experienceChart) {
+                experienceChart.destroy();
+            }
+            
+            const labels = data.levels || [];
+            const counts = data.counts || [];
+            
+            if (labels.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No experience data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const colors = [
+                'rgba(139, 92, 246, 0.8)',
+                'rgba(99, 102, 241, 0.8)',
+                'rgba(59, 130, 246, 0.8)',
+                'rgba(168, 85, 247, 0.8)'
+            ];
+            
+            experienceChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 12 },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update salary distribution chart
+        function updateSalaryDistChart(data, role = '') {
+            const canvas = document.getElementById('salaryDistChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (salaryDistChart) {
+                salaryDistChart.destroy();
+            }
+            
+            const ranges = data.ranges || [];
+            const counts = data.counts || [];
+            
+            if (ranges.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No salary distribution data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            salaryDistChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ranges,
+                    datasets: [{
+                        label: 'Number of Jobs',
+                        data: counts,
+                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 2,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.y} jobs in ${context.label} range`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                font: { size: 10 },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update skill correlation chart (bubble chart)
+        function updateSkillCorrChart(data, role = '') {
+            const canvas = document.getElementById('skillCorrChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (skillCorrChart) {
+                skillCorrChart.destroy();
+            }
+            
+            const pairs = data.pairs || [];
+            const topSkills = data.top_skills || [];
+            
+            if (pairs.length === 0 && topSkills.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No skill correlation data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            // Create a simple bar chart showing top skill pairs
+            // Count occurrences of each skill in pairs
+            const skillCounts = {};
+            pairs.forEach(pair => {
+                skillCounts[pair.skill1] = (skillCounts[pair.skill1] || 0) + pair.count;
+                skillCounts[pair.skill2] = (skillCounts[pair.skill2] || 0) + pair.count;
+            });
+            
+            // If no pairs, use top skills
+            if (pairs.length === 0 && topSkills.length > 0) {
+                topSkills.forEach(skill => {
+                    skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+                });
+            }
+            
+            // Sort by count and take top 10
+            const sortedSkills = Object.entries(skillCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const labels = sortedSkills.map(s => s[0]);
+            const counts = sortedSkills.map(s => s[1]);
+            
+            skillCorrChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Co-occurrence Count',
+                        data: counts,
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)',
+                        borderColor: 'rgba(139, 92, 246, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.x} co-occurrences`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Show placeholder initially
@@ -1122,6 +1610,26 @@
                     if (avgSalaryChart) {
                         avgSalaryChart.destroy();
                         avgSalaryChart = null;
+                    }
+                    if (companyChart) {
+                        companyChart.destroy();
+                        companyChart = null;
+                    }
+                    if (locationChart) {
+                        locationChart.destroy();
+                        locationChart = null;
+                    }
+                    if (experienceChart) {
+                        experienceChart.destroy();
+                        experienceChart = null;
+                    }
+                    if (salaryDistChart) {
+                        salaryDistChart.destroy();
+                        salaryDistChart = null;
+                    }
+                    if (skillCorrChart) {
+                        skillCorrChart.destroy();
+                        skillCorrChart = null;
                     }
                 }
             });

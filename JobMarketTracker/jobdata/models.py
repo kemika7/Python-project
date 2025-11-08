@@ -4,6 +4,13 @@ from django.utils import timezone
 
 class JobPosting(models.Model):
     """Model to store job posting data scraped from various sources."""
+    EXPERIENCE_LEVELS = [
+        ('entry', 'Entry Level'),
+        ('mid', 'Mid Level'),
+        ('senior', 'Senior Level'),
+        ('lead', 'Lead/Principal'),
+    ]
+    
     job_title = models.CharField(max_length=200)
     company = models.CharField(max_length=200)
     location = models.CharField(max_length=150)
@@ -13,6 +20,7 @@ class JobPosting(models.Model):
     description = models.TextField()
     scraped_at = models.DateTimeField(auto_now_add=True)
     job_url = models.URLField(max_length=500, blank=True, null=True)
+    experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVELS, default='mid', blank=True)
     
     class Meta:
         ordering = ['-posted_date', '-scraped_at']

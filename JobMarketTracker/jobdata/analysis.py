@@ -300,3 +300,497 @@ def get_avg_salary_by_role(role: str = None) -> Dict:
         logger.error(f"Error in get_avg_salary_by_role: {str(e)}", exc_info=True)
         return {'roles': [], 'avg_salaries': []}
 
+
+def get_company_distribution(role: str = None, top_n: int = 10) -> Dict:
+    """
+    Get job distribution by company for a specific role.
+    
+    Args:
+        role: Optional role filter
+        top_n: Number of top companies to return
+    
+    Returns:
+        Dictionary with company names and job counts
+    """
+    try:
+        jobs = JobPosting.objects.all()
+        
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        # Group by company
+        company_counts = jobs.values('company').annotate(
+            count=Count('id')
+        ).order_by('-count')[:top_n]
+        
+        companies = [item['company'] for item in company_counts]
+        counts = [item['count'] for item in company_counts]
+        
+        return {
+            'companies': companies,
+            'counts': counts,
+            'total': sum(counts)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_company_distribution: {str(e)}", exc_info=True)
+        return {'companies': [], 'counts': [], 'total': 0}
+
+
+def get_location_distribution(role: str = None) -> Dict:
+    """
+    Get job distribution by location (city) in Nepal.
+    
+    Args:
+        role: Optional role filter
+    
+    Returns:
+        Dictionary with locations and job counts
+    """
+    try:
+        jobs = JobPosting.objects.all()
+        
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        # Group by location
+        location_counts = jobs.values('location').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        locations = []
+        counts = []
+        
+        for item in location_counts:
+            # Extract city name (handle formats like "Kathmandu, Nepal" or just "Kathmandu")
+            location = item['location']
+            if location:
+                # Take first part before comma if exists
+                city = location.split(',')[0].strip()
+                locations.append(city)
+                counts.append(item['count'])
+        
+        return {
+            'locations': locations,
+            'counts': counts,
+            'total': sum(counts)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_location_distribution: {str(e)}", exc_info=True)
+        return {'locations': [], 'counts': [], 'total': 0}
+
+
+def get_experience_breakdown(role: str = None) -> Dict:
+    """
+    Get breakdown of jobs by experience level.
+    
+    Args:
+        role: Optional role filter
+    
+    Returns:
+        Dictionary with experience levels and counts
+    """
+    try:
+        jobs = JobPosting.objects.all()
+        
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        # Group by experience level
+        exp_counts = jobs.values('experience_level').annotate(
+            count=Count('id')
+        )
+        
+        # Map experience levels to readable names
+        exp_map = {
+            'entry': 'Entry Level',
+            'mid': 'Mid Level',
+            'senior': 'Senior Level',
+            'lead': 'Lead/Principal',
+            '': 'Not Specified'
+        }
+        
+        levels = []
+        counts = []
+        
+        for item in exp_counts:
+            level = item['experience_level'] or ''
+            levels.append(exp_map.get(level, level.title()))
+            counts.append(item['count'])
+        
+        return {
+            'levels': levels,
+            'counts': counts,
+            'total': sum(counts)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_experience_breakdown: {str(e)}", exc_info=True)
+        return {'levels': [], 'counts': [], 'total': 0}
+
+
+def get_salary_distribution(role: str = None, bins: int = 10) -> Dict:
+    """
+    Get salary distribution histogram data for a role.
+    
+    Args:
+        role: Optional role filter
+        bins: Number of salary bins
+    
+    Returns:
+        Dictionary with salary ranges and counts
+    """
+    try:
+        jobs = JobPosting.objects.filter(
+            salary_min__isnull=False,
+            salary_max__isnull=False
+        )
+        
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        if not jobs.exists():
+            return {'ranges': [], 'counts': [], 'min_salary': 0, 'max_salary': 0}
+        
+        # Calculate average salary for each job
+        df = pd.DataFrame(list(jobs.values('salary_min', 'salary_max')))
+        df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
+        
+        min_salary = df['avg_salary'].min()
+        max_salary = df['avg_salary'].max()
+        
+        # Create bins
+        bin_width = (max_salary - min_salary) / bins if max_salary > min_salary else 10000
+        bin_edges = [min_salary + i * bin_width for i in range(bins + 1)]
+        
+        # Count jobs in each bin
+        df['bin'] = pd.cut(df['avg_salary'], bins=bin_edges, include_lowest=True)
+        bin_counts = df['bin'].value_counts().sort_index()
+        
+        ranges = []
+        counts = []
+        
+        for bin_range, count in bin_counts.items():
+            # Format range label
+            left = int(bin_range.left)
+            right = int(bin_range.right)
+            ranges.append(f"NPR {left:,} - {right:,}")
+            counts.append(int(count))
+        
+        return {
+            'ranges': ranges,
+            'counts': counts,
+            'min_salary': int(min_salary),
+            'max_salary': int(max_salary),
+            'total': len(df)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_salary_distribution: {str(e)}", exc_info=True)
+        return {'ranges': [], 'counts': [], 'min_salary': 0, 'max_salary': 0, 'total': 0}
+
+
+def get_skill_correlations(role: str = None, top_skills: int = 10) -> Dict:
+    """
+    Get skill correlation data showing which skills appear together.
+    
+    Args:
+        role: Optional role filter
+        top_skills: Number of top skills to analyze
+    
+    Returns:
+        Dictionary with skill pairs and co-occurrence counts
+    """
+    try:
+        # First get top skills for the role
+        if role:
+            result = analyze_skills(role=role)
+            skills_dict = result.get('skills', {})
+        else:
+            skills = SkillTrend.objects.filter(role='').order_by('-frequency')[:top_skills]
+            skills_dict = {skill.skill_name: skill.frequency for skill in skills}
+        
+        if not skills_dict:
+            return {'pairs': [], 'nodes': [], 'links': []}
+        
+        # Get top skills
+        top_skill_names = sorted(skills_dict.items(), key=lambda x: x[1], reverse=True)[:top_skills]
+        top_skill_names = [skill[0] for skill in top_skill_names]
+        
+        # Get jobs
+        jobs = JobPosting.objects.all()
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        # Count co-occurrences
+        skill_pairs = Counter()
+        
+        for job in jobs:
+            description_lower = job.description.lower()
+            job_skills = [skill for skill in top_skill_names if skill.lower() in description_lower]
+            
+            # Count pairs
+            for i, skill1 in enumerate(job_skills):
+                for skill2 in job_skills[i+1:]:
+                    pair = tuple(sorted([skill1, skill2]))
+                    skill_pairs[pair] += 1
+        
+        # Format for visualization
+        pairs = []
+        for (skill1, skill2), count in skill_pairs.most_common(20):
+            pairs.append({
+                'skill1': skill1,
+                'skill2': skill2,
+                'count': count
+            })
+        
+        return {
+            'pairs': pairs,
+            'top_skills': top_skill_names
+        }
+    except Exception as e:
+        logger.error(f"Error in get_skill_correlations: {str(e)}", exc_info=True)
+        return {'pairs': [], 'top_skills': []}
+
+
+def get_location_distribution(role: str = None) -> Dict:
+    """
+    Get job distribution by location (cities in Nepal).
+    
+    Args:
+        role: Optional role filter
+    
+    Returns:
+        Dictionary with locations and job counts
+    """
+    try:
+        jobs = JobPosting.objects.all()
+        
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        if not jobs.exists():
+            return {'locations': [], 'counts': []}
+        
+        df = pd.DataFrame(list(jobs.values('location')))
+        
+        # Extract city names (handle formats like "Kathmandu, Nepal" or just "Kathmandu")
+        df['city'] = df['location'].apply(lambda x: x.split(',')[0].strip() if x else 'Unknown')
+        location_counts = df['city'].value_counts()
+        
+        return {
+            'locations': location_counts.index.tolist(),
+            'counts': location_counts.values.tolist()
+        }
+    except Exception as e:
+        logger.error(f"Error in get_location_distribution: {str(e)}", exc_info=True)
+        return {'locations': [], 'counts': []}
+
+
+def get_experience_level_breakdown(role: str = None) -> Dict:
+    """
+    Get breakdown of jobs by experience level.
+    
+    Args:
+        role: Optional role filter
+    
+    Returns:
+        Dictionary with experience levels and counts
+    """
+    try:
+        jobs = JobPosting.objects.all()
+        
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        if not jobs.exists():
+            return {'levels': [], 'counts': [], 'labels': []}
+        
+        # Infer experience level from job title and description if not set
+        jobs_list = list(jobs.values('job_title', 'description', 'experience_level'))
+        for job in jobs_list:
+            if not job['experience_level']:
+                title_lower = job['job_title'].lower()
+                desc_lower = (job['description'] or '').lower()
+                
+                if any(word in title_lower or word in desc_lower for word in ['senior', 'lead', 'principal', 'architect', '5+', '6+', '7+']):
+                    job['experience_level'] = 'senior'
+                elif any(word in title_lower or word in desc_lower for word in ['junior', 'entry', 'fresher', '0-1', '1-2']):
+                    job['experience_level'] = 'entry'
+                elif any(word in title_lower or word in desc_lower for word in ['mid', '2-3', '3-4', '4-5']):
+                    job['experience_level'] = 'mid'
+                else:
+                    job['experience_level'] = 'mid'  # Default
+        
+        df = pd.DataFrame(jobs_list)
+        experience_counts = df['experience_level'].value_counts()
+        
+        # Map to readable labels
+        level_labels = {
+            'entry': 'Entry Level',
+            'mid': 'Mid Level',
+            'senior': 'Senior Level',
+            'lead': 'Lead/Principal'
+        }
+        
+        labels = [level_labels.get(level, level.title()) for level in experience_counts.index]
+        
+        return {
+            'levels': experience_counts.index.tolist(),
+            'counts': experience_counts.values.tolist(),
+            'labels': labels
+        }
+    except Exception as e:
+        logger.error(f"Error in get_experience_level_breakdown: {str(e)}", exc_info=True)
+        return {'levels': [], 'counts': [], 'labels': []}
+
+
+def get_salary_distribution(role: str = None, bins: int = 10) -> Dict:
+    """
+    Get salary distribution histogram data.
+    
+    Args:
+        role: Optional role filter
+        bins: Number of salary bins/ranges
+    
+    Returns:
+        Dictionary with salary ranges and counts
+    """
+    try:
+        jobs = JobPosting.objects.filter(
+            salary_min__isnull=False,
+            salary_max__isnull=False
+        )
+        
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        if not jobs.exists():
+            return {'ranges': [], 'counts': []}
+        
+        df = pd.DataFrame(list(jobs.values('salary_min', 'salary_max')))
+        df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
+        
+        # Create bins
+        min_salary = df['avg_salary'].min()
+        max_salary = df['avg_salary'].max()
+        bin_width = (max_salary - min_salary) / bins
+        
+        # Create range labels
+        ranges = []
+        counts = []
+        for i in range(bins):
+            range_start = min_salary + (i * bin_width)
+            range_end = min_salary + ((i + 1) * bin_width)
+            range_label = f"NPR {int(range_start/1000)}K-{int(range_end/1000)}K"
+            ranges.append(range_label)
+            
+            count = len(df[(df['avg_salary'] >= range_start) & (df['avg_salary'] < range_end)])
+            counts.append(count)
+        
+        return {
+            'ranges': ranges,
+            'counts': counts
+        }
+    except Exception as e:
+        logger.error(f"Error in get_salary_distribution: {str(e)}", exc_info=True)
+        return {'ranges': [], 'counts': []}
+
+
+def get_skill_correlations(role: str = None, top_skills: int = 15) -> Dict:
+    """
+    Get skill correlation data (which skills appear together).
+    
+    Args:
+        role: Optional role filter
+        top_skills: Number of top skills to analyze
+    
+    Returns:
+        Dictionary with skill pairs and co-occurrence counts
+    """
+    try:
+        date_threshold = timezone.now() - timedelta(days=365)
+        jobs = JobPosting.objects.filter(posted_date__gte=date_threshold.date())
+        
+        if not jobs.exists():
+            jobs = JobPosting.objects.all()
+        
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        if not jobs.exists():
+            return {'skills': [], 'connections': []}
+        
+        # Extract skills from all job descriptions
+        all_skills = []
+        for job in jobs:
+            skills = extract_skills_from_text(job.description)
+            all_skills.append(list(skills))
+        
+        # Get top skills
+        skill_counts = Counter([skill for skills_list in all_skills for skill in skills_list])
+        top_skill_names = [skill for skill, _ in skill_counts.most_common(top_skills)]
+        
+        # Count co-occurrences
+        skill_pairs = {}
+        for skills_list in all_skills:
+            skills_in_list = [s for s in skills_list if s in top_skill_names]
+            for i, skill1 in enumerate(skills_in_list):
+                for skill2 in skills_in_list[i+1:]:
+                    pair = tuple(sorted([skill1, skill2]))
+                    skill_pairs[pair] = skill_pairs.get(pair, 0) + 1
+        
+        # Format for visualization
+        connections = []
+        for (skill1, skill2), count in sorted(skill_pairs.items(), key=lambda x: x[1], reverse=True)[:30]:
+            connections.append({
+                'source': skill1,
+                'target': skill2,
+                'value': count
+            })
+        
+        return {
+            'skills': top_skill_names,
+            'connections': connections
+        }
+    except Exception as e:
+        logger.error(f"Error in get_skill_correlations: {str(e)}", exc_info=True)
+        return {'skills': [], 'connections': []}
+

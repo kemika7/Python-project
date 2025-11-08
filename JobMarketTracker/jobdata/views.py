@@ -10,7 +10,16 @@ from django.utils import timezone
 
 from .models import JobPosting, SkillTrend
 from .serializers import JobPostingSerializer, SkillTrendSerializer
-from .analysis import analyze_skills, get_job_volume_trends, get_avg_salary_by_role
+from .analysis import (
+    analyze_skills, 
+    get_job_volume_trends, 
+    get_avg_salary_by_role,
+    get_company_distribution,
+    get_location_distribution,
+    get_experience_level_breakdown,
+    get_salary_distribution,
+    get_skill_correlations
+)
 
 
 class JobPostingViewSet(viewsets.ReadOnlyModelViewSet):
@@ -204,4 +213,62 @@ class AvgSalaryView(APIView):
         role = request.query_params.get('role', '').strip()
         salary_data = get_avg_salary_by_role(role=role if role else None)
         return Response(salary_data)
+
+
+class CompanyDistributionView(APIView):
+    """
+    Endpoint for job distribution by company.
+    """
+    def get(self, request):
+        role = request.query_params.get('role', '').strip()
+        top_n = int(request.query_params.get('top', 10))
+        from jobdata.analysis import get_company_distribution
+        data = get_company_distribution(role=role if role else None, top_n=top_n)
+        return Response(data)
+
+
+class LocationDistributionView(APIView):
+    """
+    Endpoint for geographical job distribution.
+    """
+    def get(self, request):
+        role = request.query_params.get('role', '').strip()
+        from jobdata.analysis import get_location_distribution
+        data = get_location_distribution(role=role if role else None)
+        return Response(data)
+
+
+class ExperienceLevelView(APIView):
+    """
+    Endpoint for experience level breakdown.
+    """
+    def get(self, request):
+        role = request.query_params.get('role', '').strip()
+        from jobdata.analysis import get_experience_breakdown
+        data = get_experience_breakdown(role=role if role else None)
+        return Response(data)
+
+
+class SalaryDistributionView(APIView):
+    """
+    Endpoint for salary distribution histogram.
+    """
+    def get(self, request):
+        role = request.query_params.get('role', '').strip()
+        bins = int(request.query_params.get('bins', 10))
+        from jobdata.analysis import get_salary_distribution
+        data = get_salary_distribution(role=role if role else None, bins=bins)
+        return Response(data)
+
+
+class SkillCorrelationView(APIView):
+    """
+    Endpoint for skill correlation network data.
+    """
+    def get(self, request):
+        role = request.query_params.get('role', '').strip()
+        top_skills = int(request.query_params.get('top', 15))
+        from jobdata.analysis import get_skill_correlations
+        data = get_skill_correlations(role=role if role else None, top_skills=top_skills)
+        return Response(data)
 
