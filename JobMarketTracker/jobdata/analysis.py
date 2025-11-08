@@ -90,9 +90,13 @@ def analyze_skills(role: str = None) -> Dict:
         Dictionary with analysis results
     """
     try:
-        # Get job postings (last 30 days by default)
-        date_threshold = timezone.now() - timedelta(days=30)
+        # Get job postings (last 365 days by default to include more historical data)
+        date_threshold = timezone.now() - timedelta(days=365)
         queryset = JobPosting.objects.filter(posted_date__gte=date_threshold.date())
+        
+        # If no jobs found in last 365 days, use all jobs
+        if not queryset.exists():
+            queryset = JobPosting.objects.all()
         
         if role:
             # Normalize role for matching
@@ -166,12 +170,13 @@ def analyze_skills(role: str = None) -> Dict:
         return {'skills': {}, 'total_jobs': 0, 'error': str(e)}
 
 
-def get_job_volume_trends(days: int = 30) -> Dict:
+def get_job_volume_trends(days: int = 30, role: str = None) -> Dict:
     """
     Get job volume trends over time.
     
     Args:
         days: Number of days to analyze
+        role: Optional role filter (e.g., 'python developer')
     
     Returns:
         Dictionary with date and job count
@@ -179,6 +184,24 @@ def get_job_volume_trends(days: int = 30) -> Dict:
     try:
         date_threshold = timezone.now() - timedelta(days=days)
         jobs = JobPosting.objects.filter(posted_date__gte=date_threshold.date())
+        
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs = jobs.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
+        # If no jobs found in the date range, try all jobs
+        if not jobs.exists():
+            jobs = JobPosting.objects.all()
+            if role:
+                role_normalized = role.lower().strip()
+                jobs = jobs.filter(
+                    Q(job_title__icontains=role_normalized) | 
+                    Q(description__icontains=role_normalized)
+                )
         
         # Group by date
         df = pd.DataFrame(list(jobs.values('posted_date')))
@@ -197,9 +220,12 @@ def get_job_volume_trends(days: int = 30) -> Dict:
         return {'dates': [], 'counts': []}
 
 
-def get_avg_salary_by_role() -> Dict:
+def get_avg_salary_by_role(role: str = None) -> Dict:
     """
     Calculate average salary by job role.
+    
+    Args:
+        role: Optional role filter (e.g., 'python developer')
     
     Returns:
         Dictionary with role and average salary data
@@ -211,34 +237,65 @@ def get_avg_salary_by_role() -> Dict:
             salary_max__isnull=False
         )
         
+        # Filter by role if provided
+        if role:
+            role_normalized = role.lower().strip()
+            jobs_with_salary = jobs_with_salary.filter(
+                Q(job_title__icontains=role_normalized) | 
+                Q(description__icontains=role_normalized)
+            )
+        
         if not jobs_with_salary.exists():
             return {'roles': [], 'avg_salaries': [], 'min_salaries': [], 'max_salaries': []}
         
         # Use pandas for easier aggregation
         df = pd.DataFrame(list(jobs_with_salary.values('job_title', 'salary_min', 'salary_max')))
         
-        # Normalize job titles for grouping
-        df['normalized_title'] = df['job_title'].apply(lambda x: x.lower().split()[0] if x else 'other')
-        df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
-        
-        # Group by normalized title
-        role_stats = df.groupby('normalized_title').agg({
-            'avg_salary': 'mean',
-            'salary_min': 'mean',
-            'salary_max': 'mean',
-            'job_title': 'count'
-        }).reset_index()
-        
-        role_stats = role_stats.rename(columns={'job_title': 'count'})
-        role_stats = role_stats.sort_values('avg_salary', ascending=False)
-        
-        return {
-            'roles': role_stats['normalized_title'].tolist(),
-            'avg_salaries': role_stats['avg_salary'].round(2).tolist(),
-            'min_salaries': role_stats['salary_min'].round(2).tolist(),
-            'max_salaries': role_stats['salary_max'].round(2).tolist(),
-            'counts': role_stats['count'].tolist()
-        }
+        if role:
+            # If role is specified, show average for that role
+            df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
+            avg_salary = df['avg_salary'].mean()
+            min_salary = df['salary_min'].mean()
+            max_salary = df['salary_max'].mean()
+            
+            # Use the role name or extract from job titles
+            role_name = role.lower().strip()
+            if df['job_title'].notna().any():
+                # Get most common job title that matches
+                matching_titles = df[df['job_title'].str.lower().str.contains(role_name, na=False)]['job_title']
+                if not matching_titles.empty:
+                    role_name = matching_titles.mode()[0] if not matching_titles.mode().empty else role_name
+            
+            return {
+                'roles': [role_name],
+                'avg_salaries': [round(avg_salary, 2)],
+                'min_salaries': [round(min_salary, 2)],
+                'max_salaries': [round(max_salary, 2)],
+                'counts': [len(df)]
+            }
+        else:
+            # Normalize job titles for grouping
+            df['normalized_title'] = df['job_title'].apply(lambda x: x.lower().split()[0] if x else 'other')
+            df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
+            
+            # Group by normalized title
+            role_stats = df.groupby('normalized_title').agg({
+                'avg_salary': 'mean',
+                'salary_min': 'mean',
+                'salary_max': 'mean',
+                'job_title': 'count'
+            }).reset_index()
+            
+            role_stats = role_stats.rename(columns={'job_title': 'count'})
+            role_stats = role_stats.sort_values('avg_salary', ascending=False)
+            
+            return {
+                'roles': role_stats['normalized_title'].tolist(),
+                'avg_salaries': role_stats['avg_salary'].round(2).tolist(),
+                'min_salaries': role_stats['salary_min'].round(2).tolist(),
+                'max_salaries': role_stats['salary_max'].round(2).tolist(),
+                'counts': role_stats['count'].tolist()
+            }
     except Exception as e:
         logger.error(f"Error in get_avg_salary_by_role: {str(e)}", exc_info=True)
         return {'roles': [], 'avg_salaries': []}

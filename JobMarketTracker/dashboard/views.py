@@ -10,11 +10,25 @@ def index(request):
     """
     Render the main dashboard page.
     """
+    # Get all jobs count
+    total_jobs = JobPosting.objects.count()
+    
+    # Get recent jobs (last 7 days) - extend to 365 days if no recent jobs
+    date_threshold = timezone.now() - timedelta(days=7)
+    recent_jobs = JobPosting.objects.filter(
+        posted_date__gte=date_threshold.date()
+    ).count()
+    
+    # If no recent jobs, count all jobs in last 365 days
+    if recent_jobs == 0:
+        date_threshold = timezone.now() - timedelta(days=365)
+        recent_jobs = JobPosting.objects.filter(
+            posted_date__gte=date_threshold.date()
+        ).count()
+    
     context = {
-        'total_jobs': JobPosting.objects.count(),
-        'recent_jobs': JobPosting.objects.filter(
-            posted_date__gte=(timezone.now() - timedelta(days=7)).date()
-        ).count(),
+        'total_jobs': total_jobs,
+        'recent_jobs': recent_jobs,
     }
     return render(request, 'dashboard/index.html', context)
 
