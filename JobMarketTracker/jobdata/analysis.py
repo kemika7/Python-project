@@ -507,6 +507,70 @@ def get_salary_distribution(role: str = None, bins: int = 10) -> Dict:
         return {'ranges': [], 'counts': [], 'min_salary': 0, 'max_salary': 0, 'total': 0}
 
 
+def get_job_role_distribution(limit: int = 5) -> Dict:
+    """
+    Get distribution of jobs by role (for bar and pie charts).
+    
+    Args:
+        limit: Number of top roles to return (default: 5)
+    
+    Returns:
+        Dictionary with role names and job counts
+    """
+    try:
+        # Get all jobs and group by job title (normalized)
+        jobs = JobPosting.objects.all()
+        
+        # Use pandas for easier grouping
+        df = pd.DataFrame(list(jobs.values('job_title')))
+        
+        if df.empty:
+            return {'roles': [], 'counts': []}
+        
+        # Normalize job titles (take first word or common patterns)
+        def normalize_title(title):
+            if not title:
+                return 'Other'
+            title_lower = title.lower()
+            # Common role patterns
+            if 'python' in title_lower:
+                return 'Python Developer'
+            elif 'data scientist' in title_lower or 'data science' in title_lower:
+                return 'Data Scientist'
+            elif 'full stack' in title_lower or 'fullstack' in title_lower:
+                return 'Full Stack Developer'
+            elif 'backend' in title_lower:
+                return 'Backend Developer'
+            elif 'frontend' in title_lower or 'front-end' in title_lower:
+                return 'Frontend Developer'
+            elif 'ai' in title_lower or 'ml' in title_lower or 'machine learning' in title_lower:
+                return 'AI/ML Engineer'
+            elif 'mobile' in title_lower or 'android' in title_lower or 'ios' in title_lower:
+                return 'Mobile Developer'
+            elif 'devops' in title_lower:
+                return 'DevOps Engineer'
+            else:
+                # Take first significant word
+                words = title.split()
+                if words:
+                    return words[0] + ' Developer' if len(words[0]) > 3 else title
+                return title
+        
+        df['normalized_role'] = df['job_title'].apply(normalize_title)
+        
+        # Count by normalized role
+        role_counts = df['normalized_role'].value_counts().head(limit)
+        
+        return {
+            'roles': role_counts.index.tolist(),
+            'counts': role_counts.values.tolist(),
+            'total': len(df)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_job_role_distribution: {str(e)}", exc_info=True)
+        return {'roles': [], 'counts': [], 'total': 0}
+
+
 def get_skill_correlations(role: str = None, top_skills: int = 10) -> Dict:
     """
     Get skill correlation data showing which skills appear together.

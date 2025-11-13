@@ -8,7 +8,7 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from django.utils import timezone
 
-from .models import JobPosting, SkillTrend
+from .models import JobPosting, SkillTrend, UserSearchHistory
 from .serializers import JobPostingSerializer, SkillTrendSerializer
 from .analysis import (
     analyze_skills, 
@@ -192,6 +192,17 @@ class SkillDemandView(APIView):
                 'total_skills': len(skill_data),
                 'total_frequency': total_frequency
             })
+    
+    def post(self, request):
+        """Save search to history when user performs a search."""
+        role = request.data.get('role', '').strip()
+        date_range = int(request.data.get('date_range', 30))
+        session_id = request.data.get('session_id', '')
+        
+        if role:
+            UserSearchHistory.save_search(role=role, date_range=date_range, session_id=session_id)
+            return Response({'status': 'saved'}, status=status.HTTP_201_CREATED)
+        return Response({'error': 'Role is required'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RoleVolumeView(APIView):
@@ -271,4 +282,40 @@ class SkillCorrelationView(APIView):
         from jobdata.analysis import get_skill_correlations
         data = get_skill_correlations(role=role if role else None, top_skills=top_skills)
         return Response(data)
+
+
+class JobRoleDistributionView(APIView):
+    """
+    Endpoint for job distribution by role (for bar and pie charts).
+    """
+    def get(self, request):
+        limit = int(request.query_params.get('limit', 5))
+        from jobdata.analysis import get_job_role_distribution
+        data = get_job_role_distribution(limit=limit)
+        return Response(data)
+
+
+class SearchHistoryView(APIView):
+    """
+    Endpoint for user search history.
+    """
+    def get(self, request):
+        session_id = request.query_params.get('session_id', '')
+        limit = int(request.query_params.get('limit', 10))
+        
+        searches = UserSearchHistory.objects.filter(session_id=session_id).order_by('-timestamp')[:limit]
+        from .serializers import UserSearchHistorySerializer
+        serializer = UserSearchHistorySerializer(searches, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request):
+        """Save a search to history."""
+        role = request.data.get('role', '').strip()
+        date_range = int(request.data.get('date_range', 30))
+        session_id = request.data.get('session_id', '')
+        
+        if role:
+            UserSearchHistory.save_search(role=role, date_range=date_range, session_id=session_id)
+            return Response({'status': 'saved'}, status=status.HTTP_201_CREATED)
+        return Response({'error': 'Role is required'}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -473,6 +473,157 @@
             color: var(--text-secondary);
             font-size: 1.125rem;
         }
+
+        /* Recent Searches Styling */
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .recent-searches-container {
+            position: relative;
+        }
+
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .recent-searches-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            min-width: 300px;
+            max-width: 400px;
+            z-index: 1000;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .dropdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .search-list {
+            padding: 0.5rem;
+        }
+
+        .search-item {
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .search-item:hover {
+            background: rgba(99, 102, 241, 0.05);
+            border-color: var(--primary-color);
+        }
+
+        .search-item-role {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .search-item-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .search-item-empty {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Clickable stat cards */
+        .clickable-stat {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .clickable-stat:hover:not(.disabled) {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .clickable-stat.disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+            filter: grayscale(0.5);
+        }
+
+        .clickable-stat.disabled:hover {
+            transform: none;
+            box-shadow: var(--shadow);
+        }
+
+        .clickable-stat.disabled .stat-link {
+            color: var(--text-light);
+        }
+
+        .stat-link {
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            margin-top: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .clickable-stat:not(.disabled):hover .stat-link {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -483,13 +634,15 @@
         </div>
         
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card clickable-stat disabled" id="allJobsCard" onclick="viewAllJobs()">
                 <h3>Total Jobs</h3>
                 <div class="value" id="totalJobs">{{ total_jobs }}</div>
+                <div class="stat-link">Enter a job role to view jobs →</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable-stat disabled" id="recentJobsCard" onclick="viewRecentJobs()">
                 <h3>Recent Jobs (7 days)</h3>
                 <div class="value" id="recentJobs">{{ recent_jobs }}</div>
+                <div class="stat-link">Enter a job role to view jobs →</div>
             </div>
             <div class="stat-card">
                 <h3>Skills Tracked</h3>
@@ -498,7 +651,23 @@
         </div>
         
         <div class="filter-section">
-            <h3>Filters</h3>
+            <div class="filter-header">
+                <h3>Filters</h3>
+                <div class="recent-searches-container">
+                    <button class="btn-secondary" id="toggleHistoryBtn" onclick="toggleSearchHistory()">
+                        📜 Recent Searches
+                    </button>
+                    <div class="recent-searches-dropdown" id="recentSearchesDropdown" style="display: none;">
+                        <div class="dropdown-header">
+                            <span>Recent Searches</span>
+                            <button class="close-btn" onclick="toggleSearchHistory()">×</button>
+                        </div>
+                        <div class="search-list" id="searchHistoryList">
+                            <div class="search-item-empty">No recent searches</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="filter-group">
                 <label>
                     Days Range
@@ -516,6 +685,28 @@
                     <span>&nbsp;</span>
                     <button class="btn" onclick="loadData()">Apply Filters</button>
                 </label>
+            </div>
+        </div>
+        
+        <!-- Job Distribution Charts (Always Visible) -->
+        <div class="charts-grid" id="jobRoleChartsContainer" style="display: grid; margin-bottom: 2rem;">
+            <div class="section-title">
+                <h1>📊 Job Distribution Overview</h1>
+                <p>Top job roles in the market</p>
+            </div>
+            
+            <div class="chart-card">
+                <h2>Job Distribution by Role (Bar Chart)</h2>
+                <div class="chart-container">
+                    <canvas id="jobRoleBarChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2>Job Distribution by Role (Pie Chart)</h2>
+                <div class="chart-container">
+                    <canvas id="jobRolePieChart"></canvas>
+                </div>
             </div>
         </div>
         
@@ -582,6 +773,7 @@
                     <canvas id="skillCorrChart"></canvas>
                 </div>
             </div>
+            
         </div>
         
         <div class="placeholder-message" id="placeholderMessage">
@@ -598,8 +790,70 @@
         let jobVolumeChart, skillDemandChart, avgSalaryChart;
         let companyChart, locationChart, experienceChart;
         let salaryDistChart, skillCorrChart;
+        let jobRoleBarChart, jobRolePieChart;
         let isLoading = false;
         let hasSearched = false;
+        
+        // Job viewing functions
+        function viewAllJobs() {
+            const role = document.getElementById('roleFilter').value.trim();
+            if (!role || document.getElementById('allJobsCard').classList.contains('disabled')) {
+                return;
+            }
+            
+            // Navigate to jobs list with role filter
+            const url = `/api/jobs/?search=${encodeURIComponent(role)}&page_size=100`;
+            window.open(url, '_blank');
+        }
+        
+        function viewRecentJobs() {
+            const role = document.getElementById('roleFilter').value.trim();
+            if (!role || document.getElementById('recentJobsCard').classList.contains('disabled')) {
+                return;
+            }
+            
+            // Navigate to recent jobs with role filter
+            const days = document.getElementById('daysFilter').value;
+            const url = `/api/jobs/recent/?days=${days}&search=${encodeURIComponent(role)}`;
+            window.open(url, '_blank');
+        }
+        
+        // Function to update job card states based on input validity
+        function updateJobCardStates() {
+            const role = document.getElementById('roleFilter').value.trim();
+            const allJobsCard = document.getElementById('allJobsCard');
+            const recentJobsCard = document.getElementById('recentJobsCard');
+            
+            if (role.length > 0) {
+                // Enable job cards
+                allJobsCard.classList.remove('disabled');
+                recentJobsCard.classList.remove('disabled');
+                
+                // Update stat link text
+                allJobsCard.querySelector('.stat-link').textContent = 'Click to view all jobs →';
+                recentJobsCard.querySelector('.stat-link').textContent = 'Click to view recent jobs →';
+            } else {
+                // Disable job cards
+                allJobsCard.classList.add('disabled');
+                recentJobsCard.classList.add('disabled');
+                
+                // Update stat link text
+                allJobsCard.querySelector('.stat-link').textContent = 'Enter a job role to view jobs →';
+                recentJobsCard.querySelector('.stat-link').textContent = 'Enter a job role to view jobs →';
+            }
+        }
+        
+        // Generate or retrieve session ID
+        function getSessionId() {
+            let sessionId = localStorage.getItem('jobTrackerSessionId');
+            if (!sessionId) {
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('jobTrackerSessionId', sessionId);
+            }
+            return sessionId;
+        }
+        
+        const sessionId = getSessionId();
         
         // Show loading state
         function showLoading() {
@@ -607,7 +861,7 @@
             const charts = [
                 'jobVolumeChart', 'skillDemandChart', 'avgSalaryChart',
                 'companyChart', 'locationChart', 'experienceChart',
-                'salaryDistChart', 'skillCorrChart'
+                'salaryDistChart', 'skillCorrChart', 'jobRoleBarChart', 'jobRolePieChart'
             ];
             charts.forEach(chartId => {
                 const canvas = document.getElementById(chartId);
@@ -629,8 +883,12 @@
         
         // Show placeholder message
         function showPlaceholder() {
-            document.getElementById('chartsContainer').style.display = 'none';
-            document.getElementById('placeholderMessage').style.display = 'block';
+            const chartsContainer = document.getElementById('chartsContainer');
+            const placeholderMessage = document.getElementById('placeholderMessage');
+            if (chartsContainer) chartsContainer.style.display = 'none';
+            if (placeholderMessage) placeholderMessage.style.display = 'block';
+            // Keep job role charts visible
+            loadJobRoleCharts();
         }
         
         // Hide placeholder and show charts
@@ -649,6 +907,9 @@
         
         // Load and update all data
         async function loadData() {
+            // Update job card states based on input
+            updateJobCardStates();
+            
             // Check if user has provided input
             if (!hasValidInput()) {
                 showError('Please enter a job role to view insights.');
@@ -675,7 +936,8 @@
                     locationResponse,
                     experienceResponse,
                     salaryDistResponse,
-                    skillCorrResponse
+                    skillCorrResponse,
+                    roleDistResponse
                 ] = await Promise.all([
                     fetch(`/api/analytics/role-volume/?days=${days}&role=${encodeURIComponent(role)}`),
                     fetch(`/api/analytics/skill-demand/?top=10&role=${encodeURIComponent(role)}`),
@@ -685,11 +947,14 @@
                     fetch(`/api/analytics/location-distribution/?role=${encodeURIComponent(role)}`),
                     fetch(`/api/analytics/experience-level/?role=${encodeURIComponent(role)}`),
                     fetch(`/api/analytics/salary-distribution/?role=${encodeURIComponent(role)}&bins=10`),
-                    fetch(`/api/analytics/skill-correlation/?role=${encodeURIComponent(role)}&top=15`)
+                    fetch(`/api/analytics/skill-correlation/?role=${encodeURIComponent(role)}&top=15`),
+                    fetch(`/api/analytics/job-role-distribution/?limit=5`)
                 ]);
                 
                 // Check if responses are ok
-                if (!volumeResponse.ok || !skillResponse.ok || !salaryResponse.ok) {
+                if (!volumeResponse.ok || !skillResponse.ok || !salaryResponse.ok || 
+                    !jobsResponse.ok || !companyResponse.ok || !locationResponse.ok ||
+                    !experienceResponse.ok || !salaryDistResponse.ok || !skillCorrResponse.ok || !roleDistResponse.ok) {
                     throw new Error('Failed to fetch data');
                 }
                 
@@ -703,6 +968,7 @@
                 const experienceData = await experienceResponse.json();
                 const salaryDistData = await salaryDistResponse.json();
                 const skillCorrData = await skillCorrResponse.json();
+                const roleDistData = await roleDistResponse.json();
                 
                 // Check if we have data
                 if (!volumeData.dates || volumeData.dates.length === 0) {
@@ -727,8 +993,12 @@
                 updateExperienceChart(experienceData, role);
                 updateSalaryDistChart(salaryDistData, role);
                 updateSkillCorrChart(skillCorrData, role);
+                updateJobRoleCharts(roleDistData);
                 
                 hideLoading();
+                
+                // Save search to history
+                saveSearchToHistory(role, days);
                 
                 // Show success message
                 const jobCount = volumeData.counts ? volumeData.counts.reduce((a, b) => a + b, 0) : 0;
@@ -1189,7 +1459,10 @@
                                     size: 10
                                 },
                                 maxRotation: 45,
-                                minRotation: 45
+                                minRotation: 45,
+                                maxTicksLimit: 10, // Limit number of labels
+                                autoSkip: true,
+                                autoSkipPadding: 10
                             }
                         },
                         y: {
@@ -1563,10 +1836,229 @@
             });
         }
         
+        // Update job role distribution charts
+        function updateJobRoleCharts(data) {
+            // Update bar chart
+            const barCanvas = document.getElementById('jobRoleBarChart');
+            if (barCanvas) {
+                const barCtx = barCanvas.getContext('2d');
+                
+                if (jobRoleBarChart) {
+                    jobRoleBarChart.destroy();
+                }
+                
+                const roles = data.roles || [];
+                const counts = data.counts || [];
+                
+                if (roles.length === 0) {
+                    barCtx.clearRect(0, 0, barCanvas.width, barCanvas.height);
+                    barCtx.fillStyle = '#6b7280';
+                    barCtx.font = '16px Inter';
+                    barCtx.textAlign = 'center';
+                    barCtx.fillText('No job role data available', barCanvas.width / 2, barCanvas.height / 2);
+                    return;
+                }
+                
+                jobRoleBarChart = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: roles,
+                        datasets: [{
+                            label: 'Job Count',
+                            data: counts,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.parsed.y} jobs`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    font: { family: 'Inter', size: 11 },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                                ticks: {
+                                    font: { family: 'Inter', size: 11 },
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Update pie chart
+            const pieCanvas = document.getElementById('jobRolePieChart');
+            if (pieCanvas) {
+                const pieCtx = pieCanvas.getContext('2d');
+                
+                if (jobRolePieChart) {
+                    jobRolePieChart.destroy();
+                }
+                
+                const roles = data.roles || [];
+                const counts = data.counts || [];
+                
+                if (roles.length === 0) {
+                    pieCtx.clearRect(0, 0, pieCanvas.width, pieCanvas.height);
+                    pieCtx.fillStyle = '#6b7280';
+                    pieCtx.font = '16px Inter';
+                    pieCtx.textAlign = 'center';
+                    pieCtx.fillText('No job role data available', pieCanvas.width / 2, pieCanvas.height / 2);
+                    return;
+                }
+                
+                // Generate colors for pie chart
+                const colors = roles.map((_, index) => {
+                    const hue = (index * 360) / roles.length;
+                    return `hsl(${hue}, 70%, 60%)`;
+                });
+                
+                jobRolePieChart = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: roles,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: { size: 12 },
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Save search to history
+        async function saveSearchToHistory(role, dateRange) {
+            try {
+                await fetch('/api/search-history/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        role: role,
+                        date_range: dateRange,
+                        session_id: sessionId
+                    })
+                });
+                // Reload search history
+                loadSearchHistory();
+            } catch (error) {
+                console.error('Error saving search history:', error);
+            }
+        }
+        
+        // Load search history
+        async function loadSearchHistory() {
+            try {
+                const response = await fetch(`/api/search-history/?session_id=${sessionId}&limit=10`);
+                const searches = await response.json();
+                const listElement = document.getElementById('searchHistoryList');
+                
+                if (!listElement) return;
+                
+                if (searches.length === 0) {
+                    listElement.innerHTML = '<div class="search-item-empty">No recent searches</div>';
+                    return;
+                }
+                
+                listElement.innerHTML = searches.map(search => {
+                    const escapedRole = search.role.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
+                        <div class="search-item" onclick="loadSearchFromHistory('${escapedRole}', ${search.date_range})">
+                            <div class="search-item-role">${search.role}</div>
+                            <div class="search-item-meta">
+                                <span>${search.date_range} days</span>
+                                <span>${new Date(search.timestamp).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading search history:', error);
+            }
+        }
+        
+        // Load search from history
+        function loadSearchFromHistory(role, dateRange) {
+            document.getElementById('roleFilter').value = role;
+            document.getElementById('daysFilter').value = dateRange;
+            toggleSearchHistory(); // Close dropdown
+            loadData(); // Load data
+        }
+        
+        // Toggle search history dropdown
+        function toggleSearchHistory() {
+            const dropdown = document.getElementById('recentSearchesDropdown');
+            if (!dropdown) return;
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                loadSearchHistory();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const container = document.querySelector('.recent-searches-container');
+            const dropdown = document.getElementById('recentSearchesDropdown');
+            if (container && dropdown && !container.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Show placeholder initially
             showPlaceholder();
+            
+            // Load search history on page load
+            loadSearchHistory();
             
             // Add event listeners for filters
             document.getElementById('daysFilter').addEventListener('change', function() {
@@ -1595,6 +2087,9 @@
             
             // Clear charts when input is cleared
             document.getElementById('roleFilter').addEventListener('input', function(e) {
+                // Update job card states based on current input
+                updateJobCardStates();
+                
                 if (e.target.value.trim() === '' && hasSearched) {
                     showPlaceholder();
                     hasSearched = false;
@@ -1631,9 +2126,31 @@
                         skillCorrChart.destroy();
                         skillCorrChart = null;
                     }
+                    if (jobRoleBarChart) {
+                        jobRoleBarChart.destroy();
+                        jobRoleBarChart = null;
+                    }
+                    if (jobRolePieChart) {
+                        jobRolePieChart.destroy();
+                        jobRolePieChart = null;
+                    }
                 }
             });
+            
+            // Load job role distribution charts on page load (always visible)
+            loadJobRoleCharts();
         });
+        
+        // Load job role distribution charts (always visible)
+        async function loadJobRoleCharts() {
+            try {
+                const response = await fetch('/api/analytics/job-role-distribution/?limit=5');
+                const data = await response.json();
+                updateJobRoleCharts(data);
+            } catch (error) {
+                console.error('Error loading job role distribution:', error);
+            }
+        }
         
         // Expose loadData globally for manual refresh
         window.loadData = loadData;

@@ -11,6 +11,8 @@ from .views import (
     ExperienceLevelView,
     SalaryDistributionView,
     SkillCorrelationView,
+    JobRoleDistributionView,
+    SearchHistoryView,
 )
 
 router = DefaultRouter()
@@ -28,5 +30,7 @@ urlpatterns = [
     path('analytics/experience-level/', ExperienceLevelView.as_view(), name='experience-level'),
     path('analytics/salary-distribution/', SalaryDistributionView.as_view(), name='salary-distribution'),
     path('analytics/skill-correlation/', SkillCorrelationView.as_view(), name='skill-correlation'),
+    path('analytics/job-role-distribution/', JobRoleDistributionView.as_view(), name='job-role-distribution'),
+    path('search-history/', SearchHistoryView.as_view(), name='search-history'),
 ]
 

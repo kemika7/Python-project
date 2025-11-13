@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import JobPosting, SkillTrend
+from .models import JobPosting, SkillTrend, UserSearchHistory
 
 
 @admin.register(JobPosting)
@@ -18,4 +18,13 @@ class SkillTrendAdmin(admin.ModelAdmin):
     search_fields = ('skill_name', 'role')
     readonly_fields = ('last_updated',)
     ordering = ('-frequency',)
+
+
+@admin.register(UserSearchHistory)
+class UserSearchHistoryAdmin(admin.ModelAdmin):
+    list_display = ('role', 'date_range', 'session_id', 'timestamp')
+    list_filter = ('timestamp', 'date_range')
+    search_fields = ('role', 'session_id')
+    readonly_fields = ('timestamp',)
+    ordering = ('-timestamp',)
 
